@@ -24,6 +24,8 @@ const router = express.Router();
  *   post:
  *     summary: Create a new department
  *     tags: [Department]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -33,6 +35,7 @@ const router = express.Router();
  *             required:
  *               - name
  *               - description
+ *               - managerId
  *             properties:
  *               name:
  *                 type: string
@@ -40,6 +43,9 @@ const router = express.Router();
  *               description:
  *                 type: string
  *                 example: Handles all technical tasks
+ *               managerId:
+ *                 type: string
+ *                 example: 69f0476dc5f3759f0c7c50a3
  *     responses:
  *       201:
  *         description: Department created successfully
@@ -55,14 +61,17 @@ router.post("/create", authMiddleware, isAdmin, createDepartment);
  * /departments/getAll:
  *   get:
  *     summary: Get all departments
+ *
  *     tags: [Department]
+ *     security:
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: List of all departments
  *       500:
  *         description: Server error
  */
-router.get("/getAll", getAllDepartments);
+router.get("/getAll", authMiddleware, getAllDepartments);
 
 /**
  * @swagger
@@ -70,6 +79,8 @@ router.get("/getAll", getAllDepartments);
  *   get:
  *     summary: Get department by ID
  *     tags: [Department]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -86,7 +97,7 @@ router.get("/getAll", getAllDepartments);
  *       500:
  *         description: Server error
  */
-router.get("/getById/:id", getDepartmentById);
+router.get("/getById/:id", authMiddleware, getDepartmentById);
 
 /**
  * @swagger

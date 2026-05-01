@@ -1,39 +1,69 @@
 import LeaveRequest from "../model/leaveRequest.Schema.js";
 import mongoose from "mongoose";
+import { leaveStatus, leavetype } from "../constants/enum.js";
 
 //apply for leave
 export const applyForLeave = async (req, res) => {
   try {
-    const { employeeId, type, fromDate, toDate, reason, status } = req.body;
+    const {
+      employeeId,
+      type = leavetype.SICK,
+      fromDate,
+      toDate,
+      reason,
+      status = leaveStatus.PENDING,
+    } = req.body;
     if (!employeeId) {
       return res.status(400).json({ message: "Employee ID is required" });
     }
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
       return res.status(400).json({ message: "Employee ID is not valid" });
     }
+    if (!type) {
+      return res.status(400).json({ message: "Leave type is required" });
+    }
+    if (
+      type.trim() === "" ||
+      type.trim() === null ||
+      type.trim() === undefined
+    ) {
+      return res.status(400).json({ message: "Leave type is required" });
+    }
+    if (!Object.values(leavetype).includes(type.trim())) {
+      return res.status(400).json({ message: "Leave type is not valid" });
+    }
 
     if (!fromDate) {
       return res.status(400).json({ message: "From date is required" });
     }
+    if (fromDate > toDate) {
+      return res
+        .status(400)
+        .json({ message: "From date should be less than to date" });
+    }
     if (!toDate) {
       return res.status(400).json({ message: "To date is required" });
+    }
+    if (toDate < fromDate) {
+      return res
+        .status(400)
+        .json({ message: "To date should be greater than from date" });
     }
     if (!reason) {
       return res.status(400).json({ message: "Reason is required" });
     }
-    if (!status) {
-      return res.status(400).json({ message: "Status is required" });
-    }
-
     const leaveRequest = await LeaveRequest.create({
       type,
       fromDate,
       toDate,
       reason,
       employeeId,
-      status,
+      status: leaveStatus.PENDING,
     });
-    res.status(201).json(leaveRequest);
+    res.status(201).json({
+      message: "Leave request created successfully",
+      data: leaveRequest,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -44,6 +74,8 @@ export const applyForLeave = async (req, res) => {
 export const getAllLeaveRequests = async (req, res) => {
   try {
     const { employeeId, status, type, month } = req.query;
+
+    console.log("employeeId", employeeId);
     let filter = {};
     if (employeeId) {
       filter.employeeId = employeeId;
@@ -66,7 +98,10 @@ export const getAllLeaveRequests = async (req, res) => {
     }
 
     const leaveRequests = await LeaveRequest.find(filter);
-    res.status(200).json(leaveRequests);
+    res.status(200).json({
+      message: "Leave requests fetched successfully",
+      data: leaveRequests,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -78,10 +113,7 @@ export const getMyLeaveRequests = async (req, res) => {
   try {
     const { employeeId, status } = req.query;
     let filter = {};
-    if (employeeId) {
-      filter.employeeId = employeeId;
-    }
-    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+    if (mongoose.Types.ObjectId.isValid(employeeId)) {
       filter.employeeId = employeeId;
     } else {
       return res.status(400).json({ message: "Employee ID is not valid" });
@@ -90,7 +122,10 @@ export const getMyLeaveRequests = async (req, res) => {
       filter.status = status;
     }
     const leaveRequests = await LeaveRequest.find(filter);
-    res.status(200).json(leaveRequests);
+    res.status(200).json({
+      message: "Leave requests fetched successfully",
+      data: leaveRequests,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -104,7 +139,10 @@ export const getSingleLeaveRequest = async (req, res) => {
     if (!leaveRequest) {
       return res.status(404).json({ message: "Leave request not found" });
     }
-    res.status(200).json(leaveRequest);
+    res.status(200).json({
+      message: "Leave request fetched successfully",
+      data: leaveRequest,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -131,7 +169,10 @@ export const approveLeaveRequest = async (req, res) => {
     if (!leaveRequest) {
       return res.status(404).json({ message: "Leave request not found" });
     }
-    res.status(200).json(leaveRequest);
+    res.status(200).json({
+      message: "Leave request approved successfully",
+      data: leaveRequest,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -146,6 +187,9 @@ export const rejectLeaveRequest = async (req, res) => {
     if (!reason) {
       return res.status(400).json({ message: "Reason is required" });
     }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Leave request ID is not valid" });
+    }
     const leaveRequest = await LeaveRequest.findByIdAndUpdate(
       id,
       { status: "rejected", reason },
@@ -154,7 +198,10 @@ export const rejectLeaveRequest = async (req, res) => {
     if (!leaveRequest) {
       return res.status(404).json({ message: "Leave request not found" });
     }
-    res.status(200).json(leaveRequest);
+    res.status(200).json({
+      message: "Leave request rejected successfully",
+      data: leaveRequest,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -171,7 +218,10 @@ export const cancelLeaveRequest = async (req, res) => {
     leave.status = "pending";
     await leave.save();
 
-    res.json({ message: "Leave pending", leave });
+    res.status(200).json({
+      message: "Leave pending successfully",
+      data: leave,
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

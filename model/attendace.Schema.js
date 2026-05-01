@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { attendanceStatus } from "../constants/enum.js";
 
 const attendanceSchema = new mongoose.Schema({
   employeeId: {
@@ -21,13 +22,13 @@ const attendanceSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["present", "absent", "late"],
-    required: true,
+    enum: Object.values(attendanceStatus),
+    default: attendanceStatus.ABSENT,
   },
   note: {
     type: String,
-    required: false,
   },
 });
 
-export default mongoose.model("Attendance", attendanceSchema);
+const Attendance = mongoose.model("Attendance", attendanceSchema);
+export default Attendance;

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { leavetype, leaveStatus } from "../constants/enum.js";
 
 const leaveRequestSchema = new mongoose.Schema({
   employeeId: {
@@ -7,8 +8,8 @@ const leaveRequestSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["sick", "casual", "unpaid"],
-    default: "sick",
+    enum: Object.values(leavetype),
+    default: leavetype.SICK,
   },
   fromDate: {
     type: Date,
@@ -24,8 +25,8 @@ const leaveRequestSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["approved", "rejected", "pending"],
-    default: "pending",
+    enum: Object.values(leaveStatus),
+    default: leaveStatus.PENDING,
   },
   reviewNote: {
     type: String,
@@ -33,4 +34,5 @@ const leaveRequestSchema = new mongoose.Schema({
   },
 });
 
-export default mongoose.model("LeaveRequest", leaveRequestSchema);
+const LeaveRequest = mongoose.model("LeaveRequest", leaveRequestSchema);
+export default LeaveRequest;

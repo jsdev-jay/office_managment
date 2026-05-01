@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+import { authRole, employeeStatus } from "../constants/enum.js";
 const employeeSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -9,16 +9,17 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     required: true,
     match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Please enter a valid email"],
+    unique: true,
   },
   phone: {
     type: Number,
     required: true,
     match: /^\d{10}$/,
+    unique: true,
   },
   role: {
     type: String,
-    enum: ["admin", "manager", "employee"],
-    default: "employee",
+    default: authRole.EMPLOYEE,
   },
   departmentId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -35,9 +36,10 @@ const employeeSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["active", "inactive"],
-    default: "active",
+    enums: Object.values(employeeStatus),
+    default: employeeStatus.ACTIVE,
   },
 });
 
-export default mongoose.model("Employee", employeeSchema);
+const Employee = mongoose.model("Employee", employeeSchema);
+export default Employee;

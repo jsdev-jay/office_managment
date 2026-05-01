@@ -117,7 +117,7 @@ const router = express.Router();
  *       500:
  *         description: Internal server error
  */
-router.post("/", authMiddleware, isManagerOrAdmin, applyForLeave);
+router.post("/", authMiddleware, applyForLeave);
 
 /**
  * @swagger
@@ -158,6 +158,8 @@ router.get("/", authMiddleware, isManagerOrAdmin, getAllLeaveRequests);
  * /leave/my:
  *   get:
  *     summary: Get my own leave requests (with optional filters)
+ *     security:
+ *       - BearerAuth: []
  *     tags: [LeaveRequests]
  *     parameters:
  *       - in: query
@@ -183,7 +185,7 @@ router.get("/", authMiddleware, isManagerOrAdmin, getAllLeaveRequests);
  *       500:
  *         description: Internal server error
  */
-router.get("/my", getMyLeaveRequests);
+router.get("/my", authMiddleware, getMyLeaveRequests);
 
 /**
  * @swagger
@@ -191,6 +193,8 @@ router.get("/my", getMyLeaveRequests);
  *   get:
  *     summary: Get a single leave request by ID
  *     tags: [LeaveRequests]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -210,7 +214,7 @@ router.get("/my", getMyLeaveRequests);
  *       500:
  *         description: Internal server error
  */
-router.get("/:id", getSingleLeaveRequest);
+router.get("/:id", authMiddleware, getSingleLeaveRequest);
 
 /**
  * @swagger

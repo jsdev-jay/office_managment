@@ -129,6 +129,8 @@ router.get("/", authMiddleware, isManagerOrAdmin, getAllEmployees);
  * /employees/{id}:
  *   get:
  *     summary: Get employee by ID
+ *     security:
+ *       - BearerAuth: []
  *     tags: [Employees]
  *     parameters:
  *       - in: path
@@ -147,7 +149,7 @@ router.get("/", authMiddleware, isManagerOrAdmin, getAllEmployees);
  *       404:
  *         description: Employee not found
  */
-router.get("/:id", getEmployeeById);
+router.get("/:id", authMiddleware, getEmployeeById);
 
 /**
  * @swagger

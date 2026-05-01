@@ -1,41 +1,28 @@
 import Attendance from "../model/attendace.Schema.js";
+import Employee from "../model/employe.Schema.js";
 import mongoose from "mongoose";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat.js";
 
-// // create
-// export const createAttendance = async (req, res) => {
-//   try {
-//     const {
-//       employeeId,
-//       date,
-//       checkInTime,
-//       checkOutTime,
-//       hoursWorked,
-//       status,
-//       note,
-//     } = req.body;
-//     if (!employeeId) {
-//       return res.status(400).json({ message: "Employee ID is required" });
-//     }
-//     if (!date) {
-//       return res.status(400).json({ message: "Date is required" });
-//     }
-//     if (!hoursWorked) {
-//       return res.status(400).json({ message: "Hours worked is required" });
-//     }
-//     const attendance = await Attendance.create({
-//       employeeId,
-//       date,
-//       checkInTime,
-//       checkOutTime,
-//       hoursWorked,
-//       status,
-//       note,
-//     });
-//     res.status(201).json(attendance);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
+dayjs.extend(customParseFormat);
+
+export function calculateWorkHours(checkInTime, checkOutTime) {
+  const [inHours, inMinutes] = checkInTime.split(":").map(Number);
+  const [outHours, outMinutes] = checkOutTime.split(":").map(Number);
+
+  let checkInTotalMinutes = inHours * 60 + inMinutes;
+  let checkOutTotalMinutes = outHours * 60 + outMinutes;
+
+  let diffMinutes = checkOutTotalMinutes - checkInTotalMinutes;
+  if (diffMinutes < 0) {
+    diffMinutes += 24 * 60;
+  }
+
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
+
+  return `${hours.toString().padStart(2, "0")}h ${minutes.toString().padStart(2, "0")}m`;
+}
 
 // check in
 
@@ -49,11 +36,24 @@ export const checkIn = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
       return res.status(400).json({ message: "Employee ID is not valid" });
     }
+    const employee = await Employee.findById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
     if (!date) {
       return res.status(400).json({ message: "Date is required" });
     }
+    if (!dayjs(date, "DD-MM-YYYY", true).isValid()) {
+      return res.status(400).json({ message: "Date is not in correct format" });
+    }
+
     if (!checkInTime) {
       return res.status(400).json({ message: "Check-in time is required" });
+    }
+    if (!dayjs(checkInTime, "HH:mm", true).isValid()) {
+      return res
+        .status(400)
+        .json({ message: "Check-in time is not in correct format" });
     }
     if (new Date(date).toDateString() == new Date().toDateString()) {
       status = "present";
@@ -62,6 +62,16 @@ export const checkIn = async (req, res) => {
     } else {
       status = "absent";
     }
+    const existingAttendance = await Attendance.findOne({
+      employeeId,
+      date,
+    }).lean();
+
+    if (existingAttendance) {
+      return res.status(400).json({
+        message: "Attendance already exists for this date",
+      });
+    }
 
     const attendance = await Attendance.create({
       employeeId,
@@ -69,56 +79,114 @@ export const checkIn = async (req, res) => {
       checkInTime,
       status,
     });
-    res.status(201).json(attendance);
+    res.status(201).json({
+      message: "Attendance created successfully",
+      data: attendance,
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
-// check out
+// Checkout API
 export const checkOut = async (req, res) => {
   try {
-    const { checkOutTime } = req.body;
+    const { employeeId, checkOutTime, date } = req.body;
 
+    if (!employeeId) {
+      return res.status(400).json({
+        success: false,
+        message: "employeeId is required",
+      });
+    }
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res.status(400).json({
+        success: false,
+        message: "employeeId is not valid",
+      });
+    }
     if (!checkOutTime) {
-      return res.status(400).json({ message: "Check-out time is required" });
+      return res.status(400).json({
+        success: false,
+        message: "checkOutTime is required",
+      });
     }
-    const record = await Attendance.findById(req.params.id);
-    if (!record) {
-      return res.status(404).json({ message: "Attendance not found" });
+    if (!dayjs(checkOutTime, "HH:mm", true).isValid()) {
+      return res.status(400).json({
+        success: false,
+        message: "checkOutTime is not valid",
+      });
     }
-    if (record && !record.checkInTime) {
-      return res.status(400).json({ message: "Check-in time is required" });
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: "date is required",
+      });
     }
-    function calculateWorkHours(checkInTime, checkOutTime) {
-      const diffMs = new Date(checkOutTime) - new Date(checkInTime);
+    if (!dayjs(date, "DD-MM-YYYY", true).isValid()) {
+      return res.status(400).json({
+        success: false,
+        message: "date is not valid",
+      });
+    }
+    const todayDate = dayjs().format("DD-MM-YYYY");
 
-      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-      return `${hours}h ${minutes}m`;
+    const [employee, attendance] = await Promise.all([
+      Employee.findById(employeeId).lean(),
+      Attendance.findOne({
+        employeeId,
+        date: todayDate,
+      }).lean(),
+    ]);
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found",
+      });
     }
-    const hoursWorked = calculateWorkHours(record.checkInTime, checkOutTime);
-    const attendance = await Attendance.findByIdAndUpdate(
-      req.params.id,
-      {
-        checkOutTime,
-        hoursWorked,
-      },
-      { new: true },
+
+    if (!attendance) {
+      return res.status(404).json({
+        success: false,
+        message: "Check-in not found for today",
+      });
+    }
+
+    if (attendance.checkOutTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Already checked out",
+      });
+    }
+
+    const workingHours = calculateWorkHours(
+      attendance.checkInTime,
+      checkOutTime,
     );
+    attendance.checkOutTime = checkOutTime;
+    attendance.workingHours = workingHours;
 
-    res.status(200).json({
-      message: "Checked out successfully",
-      data: attendance,
+    await attendance.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Checkout successful",
+      data: {
+        employeeId: attendance.employeeId,
+        checkInTime: attendance.checkInTime,
+        checkOutTime: attendance.checkOutTime,
+        workingHours: attendance.workingHours,
+        date: attendance.date,
+      },
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Error in check-out",
-      error: error.message,
+    return res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };
+
 // get all attendance
 
 export const getAllAttendance = async (req, res) => {
@@ -130,6 +198,11 @@ export const getAllAttendance = async (req, res) => {
     if (employeeId) {
       filter.employeeId = employeeId;
     }
+    const employee = await Employee.findById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
     if (date) {
       const selectedDate = new Date(date);
       const start = new Date(selectedDate.setHours(0, 0, 0, 0));
@@ -149,10 +222,10 @@ export const getAllAttendance = async (req, res) => {
 
     let query = Attendance.find(filter)
       .populate({
-        path: "user",
+        path: "employeeId",
         select: "name email department",
         populate: {
-          path: "department",
+          path: "departmentId",
           select: "name",
         },
       })
@@ -182,23 +255,55 @@ export const getAllAttendance = async (req, res) => {
 // get attendance by id
 export const getAttendanceById = async (req, res) => {
   try {
-    const userId = req.user.id;
-    let { month, year } = req.query;
-    const currentDate = new Date();
-    month = month ? parseInt(month) : currentDate.getMonth() + 1;
-    year = year ? parseInt(year) : currentDate.getFullYear();
+    let { month, year, employeeId } = req.body;
+
+    // validate employeeId
+    if (!employeeId) {
+      return res.status(400).json({ message: "employeeId is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res.status(400).json({ message: "employeeId is not valid" });
+    }
+
+    const employee = await Employee.findById(employeeId);
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    // validate month & year
+    if (!month || !year) {
+      return res.status(400).json({
+        message: "month and year are required",
+      });
+    }
+
+    month = parseInt(month);
+    year = parseInt(year);
+
+    if (month < 1 || month > 12) {
+      return res.status(400).json({
+        message: "month must be between 1-12",
+      });
+    }
+
+    // date range
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
+    // query
     const attendance = await Attendance.find({
-      user: userId,
-      checkIn: {
-        $gte: startDate,
-        $lte: endDate,
-      },
-    }).sort({ checkIn: -1 });
+      employeeId,
+      date: { $gte: startDate, $lte: endDate },
+    })
+      .populate({
+        path: "employeeId",
+        select: "name email", // fix here
+      })
+      .sort({ date: -1 });
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: "Attendance fetched successfully",
       total: attendance.length,
       month,
@@ -206,18 +311,20 @@ export const getAttendanceById = async (req, res) => {
       data: attendance,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: "Error fetching attendance",
       error: error.message,
     });
   }
 };
-
 // update attendance
 export const updateAttendance = async (req, res) => {
   try {
     const { checkInTime, checkOutTime, status } = req.body;
-
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid attendance ID" });
+    }
     if (!checkInTime) {
       return res.status(400).json({ message: "Check-in time is required" });
     }
@@ -229,6 +336,9 @@ export const updateAttendance = async (req, res) => {
     if (!status) {
       return res.status(400).json({ message: "Status is required" });
     }
+    if (!attendance) {
+      return res.status(404).json({ message: "Attendance not found" });
+    }
     const attendance = await Attendance.findByIdAndUpdate(
       req.params.id,
       {
@@ -238,10 +348,9 @@ export const updateAttendance = async (req, res) => {
       },
       { new: true },
     );
-    if (!attendance) {
-      return res.status(404).json({ message: "Attendance not found" });
-    }
-    res.status(200).json(attendance);
+    res
+      .status(200)
+      .json({ message: "Attendance updated successfully", data: attendance });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

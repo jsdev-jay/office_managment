@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 
-export const genrateToken = (user) => {
+export const generateToken = (user) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error("JWT secret is missing");
+  }
   return jwt.sign(
     { id: user._id, name: user.name, email: user.email, role: user.role },
     process.env.JWT_SECRET,

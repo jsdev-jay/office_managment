@@ -1,22 +1,48 @@
+import mongoose from "mongoose";
 import Department from "../model/department.Schema.js";
-
+import auth from "../model/auth.Schema.js";
+import { authRole } from "../constants/enum.js";
 
 // create
 export const createDepartment = async (req, res) => {
   try {
-    const { name, description } = req.body;
-    if (!name) {
+    const { name, description, managerId } = req.body;
+    if (!name || name.trim() == "") {
       return res.status(400).json({ message: "Name is required" });
     }
-    if (!description) {
+    if (!description || description.trim() == "") {
       return res.status(400).json({ message: "Description is required" });
+    }
+    if (!managerId || managerId.trim() == "") {
+      return res.status(400).json({ message: "Manager ID is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(managerId)) {
+      return res.status(400).json({ message: "Manager ID is not valid" });
+    }
+
+    const isvalid = await auth.findById(managerId).lean();
+    if (!isvalid) {
+      return res.status(404).json({ message: "Manager not found" });
+    }
+    if (isvalid.role !== authRole.MANAGER) {
+      return res.status(400).json({ message: "Manager is not valid" });
+    }
+
+    const isAvialble = await Department.findOne({ name: name.trim() }).lean();
+    if (isAvialble) {
+      return res.status(400).json({ message: "Department already exists" });
     }
 
     const department = await Department.create({
       name,
       description,
+      managerId,
     });
-    res.status(201).json(department);
+    res.status(201).json({
+      message: "Department created successfully",
+      data: department,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -29,7 +55,10 @@ export const getAllDepartments = async (req, res) => {
       path: "managerId",
       select: "name",
     });
-    res.status(200).json(departments);
+    res.status(200).json({
+      message: "Departments fetched successfully",
+      data: departments,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -38,6 +67,9 @@ export const getAllDepartments = async (req, res) => {
 // get by id
 export const getDepartmentById = async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Department ID is not valid" });
+    }
     const department = await Department.findById(req.params.id).populate(
       "managerId",
       "name email",
@@ -45,7 +77,10 @@ export const getDepartmentById = async (req, res) => {
     if (!department) {
       return res.status(404).json({ message: "Department not found" });
     }
-    res.status(200).json(department);
+    res.status(200).json({
+      message: "Department fetched successfully",
+      data: department,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -55,15 +90,27 @@ export const getDepartmentById = async (req, res) => {
 export const updateDepartment = async (req, res) => {
   try {
     const { name, description, managerId } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ message: "Name is required" });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Department ID is not valid" });
     }
-    if (!description) {
-      return res.status(400).json({ message: "Description is required" });
+    if (name) {
+      if (name.trim() == "") {
+        return res.status(400).json({ message: "Name is required" });
+      }
     }
-    if (!managerId) {
-      return res.status(400).json({ message: "Manager is required" });
+    if (description) {
+      if (description.trim() == "") {
+        return res.status(400).json({ message: "Description is required" });
+      }
+    }
+    if (managerId) {
+      if (!mongoose.Types.ObjectId.isValid(managerId)) {
+        return res.status(400).json({ message: "Manager ID is not valid" });
+      }
+      const isvalid = await auth.findById(managerId);
+      if (!isvalid) {
+        return res.status(404).json({ message: "Manager not found" });
+      }
     }
 
     const department = await Department.findByIdAndUpdate(
@@ -78,7 +125,10 @@ export const updateDepartment = async (req, res) => {
     if (!department) {
       return res.status(404).json({ message: "Department not found" });
     }
-    res.status(200).json(department);
+    res.status(200).json({
+      message: "Department updated successfully",
+      data: department,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -87,16 +137,14 @@ export const updateDepartment = async (req, res) => {
 // delete
 export const deleteDepartment = async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Department ID is not valid" });
+    }
     const department = await Department.findByIdAndDelete(req.params.id);
     if (!department) {
       return res.status(404).json({ message: "Department not found" });
     }
 
-    if (department.status === "active") {
-      return res
-        .status(400)
-        .json({ message: "Can not allow to delete active department" });
-    }
     res.status(200).json({ message: "Department deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });

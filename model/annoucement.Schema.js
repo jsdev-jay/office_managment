@@ -10,10 +10,6 @@ const announcementSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Employee",
-    },
     targetDepartmentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
@@ -24,4 +20,6 @@ const announcementSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
-export default mongoose.model("Announcement", announcementSchema);
+
+const Announcement = mongoose.model("Announcement", announcementSchema);
+export default Announcement;
