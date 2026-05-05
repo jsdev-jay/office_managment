@@ -76,7 +76,9 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid password" });
     }
     const token = generateToken(auth);
-    res.status(200).json({ message: "Login successful", data: auth, token });
+    res
+      .status(200)
+      .json({ message: "Login successful", data: { auth, token } });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -85,7 +87,7 @@ export const login = async (req, res) => {
 // Get My Profile
 export const getMyProfile = async (req, res) => {
   try {
-    const auth = await Auth.findById(req.userData.id);
+    const auth = await Auth.findById(req.userData.id).lean();
     if (!auth) {
       return res.status(404).json({ message: "User not found" });
     }

@@ -103,24 +103,66 @@ const router = express.Router();
  *               $ref: '#/components/schemas/Employee'
  */
 router.post("/", authMiddleware, isAdmin, createEmployee);
-
 /**
  * @swagger
  * /employees:
  *   get:
- *     summary: Get all employees (Manager or Admin)
+ *     summary: Get all employees with optional filters
  *     tags: [Employees]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: departmentId
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filter employees by department ID
+ *         example: "66301c2b8a1234567890abcd"
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filter employees by role
+ *         example: "manager"
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filter employees by status
+ *         example: "active"
  *     responses:
  *       200:
- *         description: List of employees
+ *         description: Employees fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Employee'
+ *             example:
+ *               message: Employees fetched successfully
+ *               data:
+ *                 - _id: "66301c2b8a1234567890abcd"
+ *                   name: "John Doe"
+ *                   email: "john@example.com"
+ *                   role: "employee"
+ *                   status: "active"
+ *                   departmentId:
+ *                     _id: "66301c2b8a1234567890dcba"
+ *                     name: "IT"
+ *       400:
+ *         description: Invalid department ID
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Department ID is not valid
+ *       404:
+ *         description: Department or employees not found
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: No employees found
+ *       500:
+ *         description: Server error
  */
 router.get("/", authMiddleware, isManagerOrAdmin, getAllEmployees);
 

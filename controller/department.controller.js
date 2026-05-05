@@ -21,15 +21,16 @@ export const createDepartment = async (req, res) => {
       return res.status(400).json({ message: "Manager ID is not valid" });
     }
 
-    const isvalid = await auth.findById(managerId).lean();
-    if (!isvalid) {
+    const [isValid, isAvialble] = await Promise.all([
+      auth.findById(managerId).lean(),
+      Department.findOne({ name: name.trim() }).lean(),
+    ]);
+    if (!isValid) {
       return res.status(404).json({ message: "Manager not found" });
     }
-    if (isvalid.role !== authRole.MANAGER) {
+    if (isValid.role !== authRole.MANAGER) {
       return res.status(400).json({ message: "Manager is not valid" });
     }
-
-    const isAvialble = await Department.findOne({ name: name.trim() }).lean();
     if (isAvialble) {
       return res.status(400).json({ message: "Department already exists" });
     }
@@ -51,10 +52,12 @@ export const createDepartment = async (req, res) => {
 // get all
 export const getAllDepartments = async (req, res) => {
   try {
-    const departments = await Department.find().populate({
-      path: "managerId",
-      select: "name",
-    });
+    const departments = await Department.find()
+      .populate({
+        path: "managerId",
+        select: "name",
+      })
+      .lean();
     res.status(200).json({
       message: "Departments fetched successfully",
       data: departments,
@@ -70,10 +73,9 @@ export const getDepartmentById = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Department ID is not valid" });
     }
-    const department = await Department.findById(req.params.id).populate(
-      "managerId",
-      "name email",
-    );
+    const department = await Department.findById(req.params.id)
+      .populate("managerId", "name email")
+      .lean();
     if (!department) {
       return res.status(404).json({ message: "Department not found" });
     }
@@ -121,7 +123,7 @@ export const updateDepartment = async (req, res) => {
         managerId,
       },
       { new: true },
-    );
+    ).lean();
     if (!department) {
       return res.status(404).json({ message: "Department not found" });
     }

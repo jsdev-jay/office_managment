@@ -24,44 +24,58 @@ export function calculateWorkHours(checkInTime, checkOutTime) {
   return `${hours.toString().padStart(2, "0")}h ${minutes.toString().padStart(2, "0")}m`;
 }
 
-// check in
-
+// Check-in API
 export const checkIn = async (req, res) => {
   try {
     const { employeeId, date, checkInTime } = req.body;
-    let status;
+
     if (!employeeId) {
       return res.status(400).json({ message: "Employee ID is required" });
     }
+
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
       return res.status(400).json({ message: "Employee ID is not valid" });
     }
+
     const employee = await Employee.findById(employeeId);
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
+
     if (!date) {
       return res.status(400).json({ message: "Date is required" });
     }
-    if (!dayjs(date, "DD-MM-YYYY", true).isValid()) {
-      return res.status(400).json({ message: "Date is not in correct format" });
+
+    const inputDate = dayjs(date, "YYYY-MM-DD", true);
+    if (!inputDate.isValid()) {
+      return res
+        .status(400)
+        .json({ message: "Date is not in correct format (YYYY-MM-DD)" });
+    }
+
+    const today = dayjs().startOf("day");
+
+    if (inputDate.isAfter(today)) {
+      return res.status(400).json({ message: "Future date is not allowed" });
+    }
+
+    if (inputDate.isBefore(today)) {
+      return res.status(400).json({ message: "Past date is not allowed" });
     }
 
     if (!checkInTime) {
       return res.status(400).json({ message: "Check-in time is required" });
     }
-    if (!dayjs(checkInTime, "HH:mm", true).isValid()) {
-      return res
-        .status(400)
-        .json({ message: "Check-in time is not in correct format" });
+
+    const validTime = dayjs(checkInTime, "HH:mm", true);
+    if (!validTime.isValid()) {
+      return res.status(400).json({
+        message: "Check-in time must be in HH:mm format",
+      });
     }
-    if (new Date(date).toDateString() == new Date().toDateString()) {
-      status = "present";
-    } else if (new Date(date).toISOString() > new Date().toISOString()) {
-      return res.status(400).json({ message: "Future date is not allowed" });
-    } else {
-      status = "absent";
-    }
+
+    const status = inputDate.isSame(today) ? "present" : "absent";
+
     const existingAttendance = await Attendance.findOne({
       employeeId,
       date,
@@ -75,16 +89,19 @@ export const checkIn = async (req, res) => {
 
     const attendance = await Attendance.create({
       employeeId,
-      date,
+      date: inputDate.format("YYYY-MM-DD"),
       checkInTime,
       status,
     });
-    res.status(201).json({
+
+    return res.status(201).json({
       message: "Attendance created successfully",
       data: attendance,
     });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    return res.status(500).json({
+      message: error.message || "Internal server error",
+    });
   }
 };
 
@@ -123,20 +140,20 @@ export const checkOut = async (req, res) => {
         message: "date is required",
       });
     }
-    if (!dayjs(date, "DD-MM-YYYY", true).isValid()) {
+    if (!dayjs(date, "YYYY-MM-DD", true).isValid()) {
       return res.status(400).json({
         success: false,
         message: "date is not valid",
       });
     }
-    const todayDate = dayjs().format("DD-MM-YYYY");
+    const todayDate = dayjs().format("YYYY-MM-DD");
 
     const [employee, attendance] = await Promise.all([
       Employee.findById(employeeId).lean(),
       Attendance.findOne({
         employeeId,
         date: todayDate,
-      }).lean(),
+      }),
     ]);
     if (!employee) {
       return res.status(404).json({
@@ -191,24 +208,27 @@ export const checkOut = async (req, res) => {
 
 export const getAllAttendance = async (req, res) => {
   try {
-    let { employeeId, date, month, year, departmentId } = req.query;
+    let { employeeId, date, month, year } = req.query;
 
     let filter = {};
 
     if (employeeId) {
       filter.employeeId = employeeId;
     }
-    const employee = await Employee.findById(employeeId);
+
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res.status(400).json({ message: "Employee ID is not valid" });
+    }
+    const employee = await Employee.findById(employeeId).lean();
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
-
     if (date) {
       const selectedDate = new Date(date);
       const start = new Date(selectedDate.setHours(0, 0, 0, 0));
       const end = new Date(selectedDate.setHours(23, 59, 59, 999));
 
-      filter.checkIn = { $gte: start, $lte: end };
+      filter.date = { $gte: start, $lte: end };
     }
 
     if (month) {
@@ -217,27 +237,18 @@ export const getAllAttendance = async (req, res) => {
       const start = new Date(selectedYear, month - 1, 1);
       const end = new Date(selectedYear, month, 0, 23, 59, 59);
 
-      filter.checkIn = { $gte: start, $lte: end };
+      filter.date = { $gte: start, $lte: end };
     }
 
     let query = Attendance.find(filter)
       .populate({
         path: "employeeId",
-        select: "name email department",
-        populate: {
-          path: "departmentId",
-          select: "name",
-        },
+        select: "name",
       })
-      .sort({ checkIn: -1 });
+      .sort({ date: -1 })
+      .lean();
 
     let attendance = await query;
-
-    if (departmentId) {
-      attendance = attendance.filter(
-        (a) => a.user?.department?._id.toString() === departmentId.toString(),
-      );
-    }
 
     res.status(200).json({
       message: "All attendance records fetched",
@@ -255,9 +266,8 @@ export const getAllAttendance = async (req, res) => {
 // get attendance by id
 export const getAttendanceById = async (req, res) => {
   try {
-    let { month, year, employeeId } = req.body;
+    let { month, year, employeeId } = req.query;
 
-    // validate employeeId
     if (!employeeId) {
       return res.status(400).json({ message: "employeeId is required" });
     }
@@ -266,12 +276,6 @@ export const getAttendanceById = async (req, res) => {
       return res.status(400).json({ message: "employeeId is not valid" });
     }
 
-    const employee = await Employee.findById(employeeId);
-    if (!employee) {
-      return res.status(404).json({ message: "Employee not found" });
-    }
-
-    // validate month & year
     if (!month || !year) {
       return res.status(400).json({
         message: "month and year are required",
@@ -281,26 +285,31 @@ export const getAttendanceById = async (req, res) => {
     month = parseInt(month);
     year = parseInt(year);
 
+    if (isNaN(month) || isNaN(year)) {
+      return res.status(400).json({
+        message: "month and year must be valid numbers",
+      });
+    }
+
     if (month < 1 || month > 12) {
       return res.status(400).json({
         message: "month must be between 1-12",
       });
     }
 
-    // date range
     const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // query
     const attendance = await Attendance.find({
       employeeId,
       date: { $gte: startDate, $lte: endDate },
     })
       .populate({
         path: "employeeId",
-        select: "name email", // fix here
+        select: "name",
       })
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -318,40 +327,83 @@ export const getAttendanceById = async (req, res) => {
     });
   }
 };
+
 // update attendance
+
 export const updateAttendance = async (req, res) => {
   try {
     const { checkInTime, checkOutTime, status } = req.body;
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ message: "attendance id is required" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid attendance ID" });
     }
-    if (!checkInTime) {
-      return res.status(400).json({ message: "Check-in time is required" });
+
+    if (!checkInTime || !checkOutTime || !status) {
+      return res.status(400).json({
+        message: "checkInTime, checkOutTime and status are required",
+      });
     }
 
-    if (!checkOutTime) {
-      return res.status(400).json({ message: "Check-out time is required" });
+    const checkIn = dayjs(checkInTime, "HH:mm", true);
+    const checkOut = dayjs(checkOutTime, "HH:mm", true);
+
+    if (!checkIn.isValid()) {
+      return res.status(400).json({
+        message: "Check-in time must be in HH:mm format",
+      });
     }
 
-    if (!status) {
-      return res.status(400).json({ message: "Status is required" });
+    if (!checkOut.isValid()) {
+      return res.status(400).json({
+        message: "Check-out time must be in HH:mm format",
+      });
     }
-    if (!attendance) {
-      return res.status(404).json({ message: "Attendance not found" });
+
+    if (checkOut.isBefore(checkIn)) {
+      return res.status(400).json({
+        message: "Check-out time cannot be before check-in time",
+      });
     }
-    const attendance = await Attendance.findByIdAndUpdate(
-      req.params.id,
+
+    const totalMinutes = checkOut.diff(checkIn, "minute");
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    const workedHours = `${hours}h ${minutes}m`;
+
+    const updatedAttendance = await Attendance.findByIdAndUpdate(
+      id,
       {
         checkInTime,
         checkOutTime,
         status,
+        workedHours,
       },
-      { new: true },
-    );
-    res
-      .status(200)
-      .json({ message: "Attendance updated successfully", data: attendance });
+      { returnDocument: "after", runValidators: true },
+    ).lean();
+
+    if (!updatedAttendance) {
+      return res.status(404).json({
+        success: false,
+        message: "Attendance not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Attendance updated successfully",
+      data: updatedAttendance,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Error updating attendance",
+      error: error.message,
+    });
   }
 };

@@ -1,6 +1,7 @@
 import Employee from "../model/employe.Schema.js";
 import mongoose from "mongoose";
 import Department from "../model/department.Schema.js";
+import { employeeStatus } from "../constants/enum.js";
 // create employee
 export const createEmployee = async (req, res) => {
   try {
@@ -25,21 +26,23 @@ export const createEmployee = async (req, res) => {
       return res.status(400).json({ message: "Email is required" });
     }
     if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      return res.status(400).json({ message: "Email is invalid" });
+      return res.status(400).json({ message: "Invalid Email Formate" });
     }
-    const emailExists = await Employee.findOne({ email, phone });
-    if (emailExists) {
-      return res.status(400).json({ message: "Email or phone already exists" });
-    }
-
     if (!mongoose.Types.ObjectId.isValid(departmentId)) {
       return res.status(400).json({ message: "DepartmentID is not valid" });
     }
-    const isvalid = await Department.findById(departmentId);
+    const [userExists, isvalid] = await Promise.all([
+      Employee.findOne({
+        $or: [{ email }, { phone }],
+      }).lean(),
+      Department.findById(departmentId).lean(),
+    ]);
+    if (userExists) {
+      return res.status(400).json({ message: "Email or phone already exists" });
+    }
     if (!isvalid) {
       return res.status(404).json({ message: "Department not found" });
     }
-
     const employee = await Employee.create({
       name,
       email,
@@ -49,7 +52,9 @@ export const createEmployee = async (req, res) => {
       joinDate,
       status,
     });
-    res.status(201).json({message: "Employee created successfully", data: employee});
+    res
+      .status(201)
+      .json({ message: "Employee created successfully", data: employee });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -77,11 +82,15 @@ export const getAllEmployees = async (req, res) => {
     if (status) {
       filter.status = status;
     }
-    const employees = await Employee.find(filter).populate("departmentId");
+    const employees = await Employee.find(filter)
+      .populate("departmentId")
+      .lean();
     if (!employees) {
       return res.status(404).json({ message: "No employees found" });
     }
-    res.status(200).json({message: "Employees fetched successfully", data: employees});
+    res
+      .status(200)
+      .json({ message: "Employees fetched successfully", data: employees });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -93,13 +102,15 @@ export const getEmployeeById = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Employee ID is not valid" });
     }
-    const employee = await Employee.findById(req.params.id).populate(
-      "departmentId",
-    );
+    const employee = await Employee.findById(req.params.id)
+      .populate("departmentId")
+      .lean();
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
-    res.status(200).json({message: "Employee fetched successfully", data: employee});
+    res
+      .status(200)
+      .json({ message: "Employee fetched successfully", data: employee });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -131,30 +142,31 @@ export const updateEmployee = async (req, res) => {
       if (departmentId.trim() == "") {
         return res.status(400).json({ message: "Department is required" });
       }
-    }
-    if (!mongoose.Types.ObjectId.isValid(departmentId)) {
-      return res.status(400).json({ message: "Department ID is not valid" });
+      if (!mongoose.Types.ObjectId.isValid(departmentId)) {
+        return res.status(400).json({ message: "Department ID is not valid" });
+      }
+      const isvalid = await Department.findById(departmentId).lean();
+      if (!isvalid) {
+        return res.status(404).json({ message: "Department not found" });
+      }
     }
     if (salary) {
-      if (salary.trim() == "") {
-        return res.status(400).json({ message: "Salary is required" });
+      if (isNaN(salary)) {
+        return res.status(400).json({ message: "Salary must be a number" });
       }
     }
     if (status) {
       if (status.trim() == "") {
         return res.status(400).json({ message: "Status is required" });
       }
+      if (!Object.values(employeeStatus).includes(status)) {
+        return res.status(400).json({ message: "Status is not valid" });
+      }
     }
+
     const employee = await Employee.findById(req.params.id);
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
-    }
-    if (!mongoose.Types.ObjectId.isValid(departmentId)) {
-      return res.status(400).json({ message: "Department ID is not valid" });
-    }
-    const isvalid = await Department.findById(departmentId);
-    if (!isvalid) {
-      return res.status(404).json({ message: "Department not found" });
     }
 
     employee.name = name || employee.name;
@@ -164,7 +176,9 @@ export const updateEmployee = async (req, res) => {
     employee.salary = salary || employee.salary;
     employee.status = status || employee.status;
     await employee.save();
-    res.status(200).json({message: "Employee updated successfully", data: employee});
+    res
+      .status(200)
+      .json({ message: "Employee updated successfully", data: employee });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -176,17 +190,19 @@ export const deleteEmployee = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Employee ID is not valid" });
     }
-    const employee = await Employee.findByIdAndDelete(req.params.id);
-    if (!employee) {
+    const existEmployee = await Employee.findById(req.params.id);
+    if (!existEmployee) {
       return res.status(404).json({ message: "Employee not found" });
     }
-    if (employee.status === "active") {
+    if (existEmployee.status === "active") {
       return res
         .status(400)
         .json({ message: "Can not allow to delete active employee" });
     }
-
-    res.status(200).json({ message: "Employee deleted successfully" });
+    await existEmployee.deleteOne();
+    res
+      .status(200)
+      .json({ message: "Employee deleted successfully", data: existEmployee });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

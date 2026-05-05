@@ -123,36 +123,90 @@ router.post("/", authMiddleware, applyForLeave);
  * @swagger
  * /leave:
  *   get:
- *     summary: Get all leave requests (Manager or Admin, with optional filters)
+ *     summary: Get all leave requests
+ *     description: |
+ *       Fetch leave requests with multiple filters.
+ *
+ *       You can combine filters:
+ *       - employeeId → specific employee leaves
+ *       - status → pending / approved / rejected
+ *       - type → leave type (sick, casual, paid, etc.)
+ *       - month → filter leaves by month (current year by default)
+ *
+ *       Notes:
+ *       - Month is 1-based (1 = January, 12 = December)
+ *       - Filters can be combined
  *     tags: [LeaveRequests]
  *     security:
  *       - BearerAuth: []
  *     parameters:
+ *
  *       - in: query
  *         name: employeeId
  *         schema:
  *           type: string
+ *         required: false
  *         description: Filter by employee ID
+ *         example: "66301c2b8a1234567890abcd"
+ *
  *       - in: query
  *         name: status
  *         schema:
  *           type: string
- *           enum: [pending, approved, rejected, canceled]
+ *           enum: [pending, approved, rejected]
+ *         required: false
  *         description: Filter by leave status
+ *         example: "approved"
+ *
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filter by leave type
+ *         example: "sick"
+ *
+ *       - in: query
+ *         name: month
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 12
+ *         required: false
+ *         description: Filter by month (1-12, current year assumed)
+ *         example: 5
+ *
  *     responses:
  *       200:
- *         description: List of leave requests
+ *         description: Leave requests fetched successfully
  *         content:
  *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/LeaveRequest'
+ *             example:
+ *               message: Leave requests fetched successfully
+ *               data:
+ *                 - _id: "66301c2b8a1234567890aaaa"
+ *                   employeeId: "66301c2b8a1234567890abcd"
+ *                   type: "sick"
+ *                   status: "approved"
+ *                   fromDate: "2026-05-01T00:00:00.000Z"
+ *                   toDate: "2026-05-03T00:00:00.000Z"
+ *                   reason: "Fever"
+ *                   createdAt: "2026-04-28T10:00:00.000Z"
+ *
+ *       400:
+ *         description: Invalid employee ID
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Employee ID is not valid
+ *
+ *       401:
+ *         description: Unauthorized
+ *
  *       500:
- *         description: Internal server error
+ *         description: Server error
  */
-router.get("/", authMiddleware, isManagerOrAdmin, getAllLeaveRequests);
-
+router.get("/", authMiddleware, getAllLeaveRequests);
 /**
  * @swagger
  * /leave/my:

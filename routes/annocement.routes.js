@@ -45,9 +45,6 @@ const router = express.Router();
  *                 type: string
  *                 nullable: true
  *                 example: 661f2a8b1234567890abcd12
- *               createdBy:
- *                 type: string
- *                 example: 661f2a8b1234567890abcd99
  *     responses:
  *       201:
  *         description: Announcement created successfully
@@ -59,7 +56,6 @@ const router = express.Router();
  *         description: Admin only
  */
 router.post("/", authMiddleware, isAdmin, createAnnouncement);
-
 /**
  * @swagger
  * /announcement:
@@ -69,13 +65,42 @@ router.post("/", authMiddleware, isAdmin, createAnnouncement);
  *       - Admin → gets all announcements
  *       - Employee → gets only:
  *         • Their department announcements
- *         • Company-wide announcements (targetDepartment = null)
+ *         • Company-wide announcements (targetDepartmentId = null)
  *     tags: [Announcements]
  *     security:
  *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: targetDepartmentId
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Filter announcements by target department ID
+ *         example: "66301c2b8a1234567890abcd"
  *     responses:
  *       200:
  *         description: List of announcements
+ *         content:
+ *           application/json:
+ *             example:
+ *               message: Announcements fetched successfully
+ *               data:
+ *                 - _id: "66301c2b8a1234567890abcd"
+ *                   title: "Meeting Update"
+ *                   description: "Team meeting at 4 PM"
+ *                   targetDepartmentId: "66301c2b8a1234567890dcba"
+ *                   createdAt: "2026-05-01T10:00:00.000Z"
+ *                 - _id: "66301c2b8a1234567890abce"
+ *                   title: "Holiday Notice"
+ *                   description: "Office closed tomorrow"
+ *                   targetDepartmentId: null
+ *                   createdAt: "2026-05-02T10:00:00.000Z"
+ *       400:
+ *         description: Invalid department ID
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
  */
 router.get("/", authMiddleware, getAllAnnouncements);
 
@@ -130,9 +155,6 @@ router.get("/:id", authMiddleware, getAnnouncementById);
  *               body:
  *                 type: string
  *                 example: Updated body content
- *               targetDepartment:
- *                 type: string
- *                 nullable: true
  *     responses:
  *       200:
  *         description: Announcement updated successfully

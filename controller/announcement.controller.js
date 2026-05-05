@@ -59,10 +59,9 @@ export const getAllAnnouncements = async (req, res) => {
     if (!isvalid) {
       return res.status(404).json({ message: "Department not found" });
     }
-    const announcements = await Announcement.find(targetDepartmentId).populate(
-      "targetDepartmentId",
-      "name",
-    );
+    const announcements = await Announcement.find({ targetDepartmentId })
+      .populate("targetDepartmentId", "name")
+      .lean();
     res.json({
       message: "Announcements fetched successfully",
       data: announcements,
@@ -77,10 +76,9 @@ export const getAnnouncementById = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Announcement ID is not valid" });
     }
-    const announcement = await Announcement.findById(req.params.id).populate(
-      "createdBy",
-      "name role",
-    );
+    const announcement = await Announcement.findById(req.params.id)
+      .populate("targetDepartmentId", "name")
+      .lean();
     if (!announcement) {
       return res.status(404).json({ message: "Announcement not found" });
     }
@@ -96,15 +94,15 @@ export const getAnnouncementById = async (req, res) => {
 // Update Announcement
 export const updateAnnouncement = async (req, res) => {
   try {
-    const { title, description } = req.body;
+    const { title, body } = req.body;
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "Announcement ID is not valid" });
     }
     const announcement = await Announcement.findByIdAndUpdate(
       req.params.id,
-      { title, description },
+      { title, body },
       { new: true },
-    );
+    ).lean();
     if (!announcement) {
       return res.status(404).json({ message: "Announcement not found" });
     }
@@ -127,7 +125,10 @@ export const deleteAnnouncement = async (req, res) => {
     if (!announcement) {
       return res.status(404).json({ message: "Announcement not found" });
     }
-    res.status(200).json({ message: "Announcement deleted successfully" });
+    res.status(200).json({
+      message: "Announcement deleted successfully",
+      data: announcement,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

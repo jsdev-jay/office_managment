@@ -36,6 +36,16 @@ export const applyForLeave = async (req, res) => {
     if (!fromDate) {
       return res.status(400).json({ message: "From date is required" });
     }
+    if (
+      fromDate.trim() === "" ||
+      fromDate.trim() === null ||
+      fromDate.trim() === undefined
+    ) {
+      return res.status(400).json({ message: "From date is required" });
+    }
+    if (new Date(fromDate).getTime() < new Date().getTime()) {
+      return res.status(400).json({ message: "From date is not valid" });
+    }
     if (fromDate > toDate) {
       return res
         .status(400)
@@ -121,7 +131,7 @@ export const getMyLeaveRequests = async (req, res) => {
     if (status) {
       filter.status = status;
     }
-    const leaveRequests = await LeaveRequest.find(filter);
+    const leaveRequests = await LeaveRequest.find(filter).lean();
     res.status(200).json({
       message: "Leave requests fetched successfully",
       data: leaveRequests,
@@ -135,7 +145,7 @@ export const getMyLeaveRequests = async (req, res) => {
 
 export const getSingleLeaveRequest = async (req, res) => {
   try {
-    const leaveRequest = await LeaveRequest.findById(req.params.id);
+    const leaveRequest = await LeaveRequest.findById(req.params.id).lean();
     if (!leaveRequest) {
       return res.status(404).json({ message: "Leave request not found" });
     }
@@ -165,7 +175,7 @@ export const approveLeaveRequest = async (req, res) => {
       id,
       { status: "approved", reviewNote },
       { new: true },
-    );
+    ).lean();
     if (!leaveRequest) {
       return res.status(404).json({ message: "Leave request not found" });
     }
@@ -194,7 +204,7 @@ export const rejectLeaveRequest = async (req, res) => {
       id,
       { status: "rejected", reason },
       { new: true },
-    );
+    ).lean();
     if (!leaveRequest) {
       return res.status(404).json({ message: "Leave request not found" });
     }
@@ -210,7 +220,7 @@ export const rejectLeaveRequest = async (req, res) => {
 // cancel leave request
 export const cancelLeaveRequest = async (req, res) => {
   try {
-    const leave = await LeaveRequest.findById(req.params.id);
+    const leave = await LeaveRequest.findById(req.params.id).lean();
 
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
