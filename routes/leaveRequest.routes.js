@@ -206,7 +206,7 @@ router.post("/", authMiddleware, applyForLeave);
  *       500:
  *         description: Server error
  */
-router.get("/", authMiddleware, getAllLeaveRequests);
+router.get("/", authMiddleware, isManagerOrAdmin, getAllLeaveRequests);
 /**
  * @swagger
  * /leave/my:
@@ -380,6 +380,6 @@ router.put("/:id/reject", authMiddleware, isManagerOrAdmin, rejectLeaveRequest);
  *       500:
  *         description: Internal server error
  */
-router.put("/:id/cancel", authMiddleware, isManagerOrAdmin, cancelLeaveRequest);
+router.put("/:id/cancel", authMiddleware, cancelLeaveRequest);
 
 export default router;

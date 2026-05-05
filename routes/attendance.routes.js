@@ -6,7 +6,7 @@ import {
   getAttendanceById,
   updateAttendance,
 } from "../controller/attendace.controller.js";
-import authMiddleware from "../middleware/auth.middleware.js";
+import authMiddleware, { isAdmin } from "../middleware/auth.middleware.js";
 import { isManagerOrAdmin } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -72,7 +72,7 @@ router.post("/checkin", authMiddleware, checkIn);
  *       400:
  *         description: Validation error
  */
-router.post("/checkout", checkOut);
+router.post("/checkout", authMiddleware, checkOut);
 
 /**
  * @swagger
@@ -80,6 +80,8 @@ router.post("/checkout", checkOut);
  *   get:
  *     summary: Get all attendance records
  *     tags: [Attendance]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: query
  *         name: employeeId
@@ -105,7 +107,7 @@ router.post("/checkout", checkOut);
  *       200:
  *         description: Attendance fetched successfully
  */
-router.get("/", getAllAttendance);
+router.get("/", authMiddleware, isManagerOrAdmin, getAllAttendance);
 
 /**
  * @swagger
@@ -113,6 +115,8 @@ router.get("/", getAllAttendance);
  *   get:
  *     summary: Get attendance by employeeId, month & year
  *     tags: [Attendance]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: query
  *         name: employeeId
@@ -136,7 +140,7 @@ router.get("/", getAllAttendance);
  *       200:
  *         description: Attendance fetched successfully
  */
-router.get("/", getAttendanceById);
+router.get("/", authMiddleware, getAttendanceById);
 
 /**
  * @swagger
@@ -144,6 +148,8 @@ router.get("/", getAttendanceById);
  *   put:
  *     summary: Update attendance
  *     tags: [Attendance]
+ *     security:
+ *       - BearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
@@ -163,6 +169,6 @@ router.get("/", getAttendanceById);
  *       200:
  *         description: Attendance updated successfully
  */
-router.put("/:id", updateAttendance);
+router.put("/:id", authMiddleware, isAdmin, updateAttendance);
 
 export default router;

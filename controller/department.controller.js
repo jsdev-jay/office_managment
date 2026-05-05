@@ -99,7 +99,15 @@ export const updateDepartment = async (req, res) => {
       if (name.trim() == "") {
         return res.status(400).json({ message: "Name is required" });
       }
+      const isNameValid = await Department.findOne({
+        name: name.trim(),
+        _id: { $ne: req.params.id },
+      });
+      if (isNameValid) {
+        return res.status(400).json({ message: "Name is already exists" });
+      }
     }
+
     if (description) {
       if (description.trim() == "") {
         return res.status(400).json({ message: "Description is required" });
@@ -147,7 +155,10 @@ export const deleteDepartment = async (req, res) => {
       return res.status(404).json({ message: "Department not found" });
     }
 
-    res.status(200).json({ message: "Department deleted successfully" });
+    res.status(200).json({
+      message: "Department deleted successfully",
+      data: { ...department },
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

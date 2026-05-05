@@ -132,6 +132,13 @@ export const updateEmployee = async (req, res) => {
       if (phone.trim() == "") {
         return res.status(400).json({ message: "Phone is required" });
       }
+      const isPhoneValid = await Employee.findOne({
+        phone: phone.trim(),
+        _id: { $ne: req.params.id },
+      });
+      if (isPhoneValid) {
+        return res.status(400).json({ message: "Phone is already exists" });
+      }
     }
     if (role) {
       if (role.trim() == "") {

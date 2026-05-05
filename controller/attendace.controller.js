@@ -128,6 +128,7 @@ export const checkOut = async (req, res) => {
         message: "checkOutTime is required",
       });
     }
+
     if (!dayjs(checkOutTime, "HH:mm", true).isValid()) {
       return res.status(400).json({
         success: false,
@@ -175,6 +176,12 @@ export const checkOut = async (req, res) => {
         message: "Already checked out",
       });
     }
+    if (attendance.checkInTime >= checkOutTime) {
+      return res.status(400).json({
+        success: false,
+        message: "checkOutTime must be greater than checkInTime",
+      });
+    }
 
     const workingHours = calculateWorkHours(
       attendance.checkInTime,
@@ -213,16 +220,15 @@ export const getAllAttendance = async (req, res) => {
     let filter = {};
 
     if (employeeId) {
-      filter.employeeId = employeeId;
+      if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+        return res.status(400).json({ message: "Employee ID is not valid" });
+      }
+      const employee = await Employee.findById(employeeId).lean();
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
     }
 
-    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-      return res.status(400).json({ message: "Employee ID is not valid" });
-    }
-    const employee = await Employee.findById(employeeId).lean();
-    if (!employee) {
-      return res.status(404).json({ message: "Employee not found" });
-    }
     if (date) {
       const selectedDate = new Date(date);
       const start = new Date(selectedDate.setHours(0, 0, 0, 0));
@@ -341,12 +347,6 @@ export const updateAttendance = async (req, res) => {
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid attendance ID" });
-    }
-
-    if (!checkInTime || !checkOutTime || !status) {
-      return res.status(400).json({
-        message: "checkInTime, checkOutTime and status are required",
-      });
     }
 
     const checkIn = dayjs(checkInTime, "HH:mm", true);

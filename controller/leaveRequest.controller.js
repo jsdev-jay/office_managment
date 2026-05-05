@@ -1,6 +1,8 @@
 import LeaveRequest from "../model/leaveRequest.Schema.js";
+import Employee from "../model/employe.Schema.js";
 import mongoose from "mongoose";
-import { leaveStatus, leavetype } from "../constants/enum.js";
+import { leaveStatus } from "../constants/enum.js";
+import { leavetype } from "../constants/enum.js";
 
 //apply for leave
 export const applyForLeave = async (req, res) => {
@@ -18,6 +20,10 @@ export const applyForLeave = async (req, res) => {
     }
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
       return res.status(400).json({ message: "Employee ID is not valid" });
+    }
+    const employee = await Employee.findById(employeeId).lean();
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found" });
     }
     if (!type) {
       return res.status(400).json({ message: "Leave type is required" });
@@ -220,12 +226,15 @@ export const rejectLeaveRequest = async (req, res) => {
 // cancel leave request
 export const cancelLeaveRequest = async (req, res) => {
   try {
-    const leave = await LeaveRequest.findById(req.params.id).lean();
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Leave request ID is not valid" });
+    }
+    const leave = await LeaveRequest.findById(req.params.id);
 
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
     }
-    leave.status = "pending";
+    leave.status = leaveStatus.PENDING;
     await leave.save();
 
     res.status(200).json({
