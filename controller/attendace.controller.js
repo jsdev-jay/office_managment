@@ -147,13 +147,17 @@ export const checkOut = async (req, res) => {
         message: "date is not valid",
       });
     }
-    const todayDate = dayjs().format("YYYY-MM-DD");
 
+    const today = dayjs().startOf("day");
+
+    if (dayjs(date).isAfter(today)) {
+      return res.status(400).json({ message: "Future date is not allowed" });
+    }
     const [employee, attendance] = await Promise.all([
       Employee.findById(employeeId).lean(),
       Attendance.findOne({
         employeeId,
-        date: todayDate,
+        date: dayjs(date).format("YYYY-MM-DD"),
       }),
     ]);
     if (!employee) {
@@ -167,13 +171,6 @@ export const checkOut = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Check-in not found for today",
-      });
-    }
-
-    if (attendance.checkOutTime) {
-      return res.status(400).json({
-        success: false,
-        message: "Already checked out",
       });
     }
     if (attendance.checkInTime >= checkOutTime) {

@@ -96,7 +96,7 @@ export const updateDepartment = async (req, res) => {
       return res.status(400).json({ message: "Department ID is not valid" });
     }
     if (name) {
-      if (name.trim() == "") {
+      if (name.trim() === "") {
         return res.status(400).json({ message: "Name is required" });
       }
       const isNameValid = await Department.findOne({
@@ -157,7 +157,7 @@ export const deleteDepartment = async (req, res) => {
 
     res.status(200).json({
       message: "Department deleted successfully",
-      data: { ...department },
+      data: { department },
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
